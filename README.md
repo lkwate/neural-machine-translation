@@ -2,4 +2,4 @@
 
 # demonstration
 
-![demo](/home/kwate/Document_kwate/programming/python/natural_l_p/neural-machine-translation/demo.jpg)
+![demo](https://github.com/lkwate/neural-machine-translation/blob/master/demo.jpg)
