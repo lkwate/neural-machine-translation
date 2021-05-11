@@ -1,39 +1,82 @@
 import torch.nn as nn
 import torch
 
-## BI-lstm encoder
+class NMTEncoder(nn.Modeule):
+    '''
+        Neural Machine translation encoder
+        This class merely shapes a simple RNN-based encoder for NMT, 
+        the specific implementation parameters are provided as arguments in a dictionary
+    '''
+    def __init__(self, args):
+        super(NMTEncoder, self).__init__()
+        self.args = args
 
-class EncoderRNN(nn.Module):
-    def __init__(self, vocab_size, input_size, hidden_size):
-        super(EncoderRNN, self).__init__()
-        self.vocab_size = vocab_size
-        self.input_size = input_size
-        self.hidden_size = hidden_size
-        self.embedding_layer = nn.Embedding(vocab_size, input_size)
-        self.BiLTSM_layer = nn.LSTM(input_size, hidden_size, bidirectional=True)
-        self.linearWc = nn.Linear(2 * hidden_size, hidden_size)
-        self.linearWh = nn.Linear(2 * hidden_size, hidden_size)
-
-    def forward(self, sequence):
+        # layers
+        self.embedding = nn.Embedding(args.vocab_size, args.input_size, padding_idx=args.padding_idx)
+        # encoder parameters
+        encoder_parameters = {
+            'input_size' : args.input_size,
+            'hidden_size' : args.hidden_size,
+            'num_layers' : args.num_layers,
+            'bidirectional' : args.bidirectional,
+            'batch_first' : True
+        }
+        if args.encoder == 'gru':
+            self.rnn_encoder = nn.GRU(**encoder_parameters)
+        else:
+            self.rnn_encoder == nn.LSTM(**encoder_parameters)
+        
+        # if the bidirectional parameter is the argument dictionary is set to True, 
+        # then projectize the RNN output in a convenient space.
+        if args.bidirectional:
+            self.linearWc = nn.Linear(2 * args.hidden_size, args.hidden_size)
+            self.linearWh = nn.Linear(2 * args.hidden_size, args.hidden_size)
+        
+    
+    def forward(self, input):
         '''
-            this function return a tuple of (output, (h_n, c_n))
-            output : all the output of recurrent model shape (seq_length, batch, num_layer * num_direction)
-            h_n : last hidden state shape (num_layer * num_direction, batch, hidden_size)
-            c_n : last cell state, it has the same shape of h_n
+            input : token batch indices (batch_size, seq_len)
         '''
-        # we assume that sequence is list of integers which are indices of words in vocabulary
+        output = self.embedding(input) # (batch_size, seq_len, input_size)
+        shape_hidden_state = (input.shape[0],self.args.num_layers * 2 if self.args.bidirectional else 1, self.args.hidden_size)
 
-        embedded = self.embedding_layer(sequence)
-        h_0 = torch.zeros((2, 1, self.hidden_size))
-        c_0 = torch.zeros((2, 1, self.hidden_size))
-        output, (h_n, c_n) = self.BiLTSM_layer(embedded, (h_0, c_0))
-        output = output.squeeze(1)  # shape (seq_length, 2 * hidden_size)
-        h_n = self.linearWh(output[output.shape[0] - 1]).reshape(1, 1, h_n.shape[2])
-        c_n = self.linearWc(torch.cat((c_n[1], c_n[0]), 1)).reshape(1, 1, c_n.shape[2])
-        return output, (h_n, c_n)
+        h0 = torch.zeros(shape_hidden_state).type_as(input) # set the type of the newly created tensor the same as the internal device, helpful to automatically train on any device
 
-    def init_weights(self):
-        return torch.zeros(2, 1, self.hiddent_size)
+        output, (_, _) = self.rnn_encoder(output, (h0, h0)) # output shape (batch_size, seq_len, num_layers * num_directions)
+
+        return output
+
+class DotAlignment(nn.Module):
+    pass
+
+class MultiplicativeAlignment(nn.Module):
+    pass
+
+class AdditiveAlignment(nn.Module):
+    pass
+
+class Alignment(nn.Module):
+    def __init__(self, args):
+        super(Alignment, self).__init__()
+        self.args = args
+
+        if args.attention == 'dot':
+            self.alignment = DotAlignment(args)
+        elif args.attention == 'multiplicative':
+            self.alignment = MultiplicativeAlignment(args)
+        else:
+            # attention == 'additive'
+            self.alignment = AdditiveAlignment(args)
+
+    def forward(self, decoder_output, encoder_output):
+        return self.alignment(decoder_output, encoder_output)
+
+class Decoder(nn.Module):
+    def __init__(self, args):
+        super(Decoder, self).__init__()
+        self.args = args
+        self.alignment = Alignment(args)
+
 
 ## attention decoder
 class AttnDecoderRNN(nn.Module):
