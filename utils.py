@@ -14,8 +14,9 @@ plt.switch_backend('agg')
 import matplotlib.ticker as ticker
 import numpy as np
 
-SOS_token = 0
-EOS_token = 1
+PAD_token = 0
+SOS_token = 1
+EOS_token = 2
 MAX_LENGTH = 10
 hidden_size = 256
 
@@ -34,8 +35,8 @@ class Lang:
         self.name = name
         self.word2index = {}
         self.word2count = {}
-        self.index2word = {0: "SOS", 1: "EOS"}
-        self.n_words = 2  # count SOS and EOS
+        self.index2word = {1: "SOS", 2: "EOS", 0: "PAD"}
+        self.n_words = 3  # count SOS, EOS, and PAD
 
     def addSentence(self, sentence):
         for word in sentence.split(' '):
@@ -141,4 +142,4 @@ def showPlot(points):
     # this locator puts ticks at regular intervals
     loc = ticker.MultipleLocator(base=0.2)
     ax.yaxis.set_major_locator(loc)
-    plt.plot
+    plt.plot()

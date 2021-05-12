@@ -1,0 +1,19 @@
+{
+    "return_attention_scores" : true,
+    "hidden_size" : 128,
+    "input_seq_len" : 40,
+    "target_seq_len" : 40,
+    "hidden_alignment_size" : 32,
+    "attention" : "dot",
+    "num_layers" : 3,
+    "input_size" : 64, 
+    "padding_idx" : 0,
+    "encoder_vocab_size" : 1000,
+    "decoder_vocab_size" : 1000,
+    "hidden_alignement_size" : 32,
+    "encoder_dropout" : 0.1,
+    "decoder_dropout" : 0.1,
+    "bidirectional" : true,
+    "encoder" : "lstm",
+    "decoder" : "lstm"
+}
