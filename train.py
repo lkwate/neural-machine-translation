@@ -13,6 +13,7 @@ def train(args):
 
     early_stop_callback = EarlyStopping(monitor='val_loss', patience=args.patience, mode='min', strict=False, verbose=True)
     trainer_args = {
+        'gpus' : -1,
         'max_epochs' : args.max_epochs, 
         'val_check_interval':args.val_check_interval, 'callbacks' : [early_stop_callback]
     }
