@@ -25,6 +25,7 @@ class LangDataset(Dataset):
 class LangDataModule(pl.LightningDataModule):
 
     def __init__(self, args):
+        super().__init__()
         self.args = args
         
     def prepare_data(self):
@@ -36,9 +37,9 @@ class LangDataModule(pl.LightningDataModule):
         self.train_dataset, self.val_dataset = random_split(self.dataset, [train_len, val_len])
 
     def train_dataloader(self):
-        dataloader = DataLoader(self.train_dataset, batch_size = self.args.batch_size)
+        dataloader = DataLoader(self.train_dataset, num_workers=self.args.num_workers, batch_size=self.args.batch_size)
         return dataloader
 
     def val_dataloader(self):
-        dataloader = DataLoader(self.val_dataset, batch_size=self.args.batch_size)
+        dataloader = DataLoader(self.val_dataset, num_workers=self.args.num_workers, batch_size=self.args.batch_size)
         return dataloader
