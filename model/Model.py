@@ -1,7 +1,11 @@
+from torch._C import device
+from utils import SOS_token
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.optim as optim
 from .Alignment import *
+import pytorch_lightning as pl
 
 class NMTEncoder(nn.Module):
     '''
@@ -95,3 +99,55 @@ class NMTDecoder(nn.Module):
             output += (output_alignment[-1],)
         
         return output
+
+class NMTTranslator(pl.LightningModule):
+    
+    def __init__(self, args):
+        super().__init__()
+        self.args = args
+        self.device_ = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.encoder = NMTEncoder(args)
+        self.decoder = NMTDecoder(args)
+        self.criterion = nn.CrossEntropyLoss(reduction='none')
+
+    def configure_optimizers(self):
+        optimizer = optim.Adam(self.parameters(), lr=self.args.learning_rate)
+        return optimizer
+
+    def training_step(self, batch, batch_idx):
+        loss = self.compute_loss(batch)
+        self.log('train_loss', loss)
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        loss = self.compute_loss(batch)
+        self.log('val_loss', loss)
+        return loss
+
+    def compute_loss(self, batch):
+        input_ids = batch[0].squeeze(-2)
+        target_ids = batch[-1].squeeze(-2)
+        batch_size = input_ids.shape[0]
+        target_seq_len = target_ids.shape[-1]
+        mask = 1 - (target_ids == 0).to(torch.long)
+
+        encoder_output = self.encoder(input_ids)
+        decoder_output = [torch.tensor([SOS_token] * batch_size ,dtype=torch.long).type_as(input_ids)]
+        h, c = torch.split(torch.zeros((self.args.num_layers, batch_size, self.args.hidden_size, 2), device=self.device), 1, dim=-1)
+        h, c = h.squeeze(-1), c.squeeze(-1)
+
+        losses = []
+        for i in range(target_seq_len):
+            output = self.decoder(decoder_output[-1], h, c, encoder_output)
+            h, c= output[1], output[2]
+
+            y_pred = output[0].argmax(-1) 
+            decoder_output.append(y_pred)
+
+            loss = self.criterion(output[0], target_ids[:, i]).unsqueeze(-1)
+            losses.append(loss)
+        
+        loss = torch.cat(losses, -1) # (batch_size, seq_len)
+        loss = loss * mask
+
+        return loss.mean()

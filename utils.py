@@ -17,9 +17,8 @@ import numpy as np
 PAD_token = 0
 SOS_token = 1
 EOS_token = 2
-MAX_LENGTH = 10
+MAX_LENGTH = 15
 hidden_size = 256
-
 
 eng_prefixes = (
     "i am", "i m",
@@ -67,7 +66,7 @@ def readLangs(lang1, lang2, reverse=False):
     print("Reading lines...")
 
     # Read the file and split into lines
-    lines = open('/data/%s-%s.txt' % (lang1, lang2), encoding='utf-8').read().strip().split('\n')
+    lines = open('data/%s-%s.txt' % (lang1, lang2), encoding='utf-8').read().strip().split('\n')
 
     # Split every line into pairs and normalize
     pairs = [[normalizeString(s) for s in l.split('\t')] for l in lines]
@@ -107,12 +106,14 @@ def prepareData(lang1, lang2, reverse=False):
 
 ##preparing training data
 def indexesFromSentence(lang, sentence):
-    return [lang.word2index[word] for word in sentence.split(' ')]
+    output = [lang.word2index[word] for word in sentence.split(' ')]
+    return output
 
 def tensorFromSentence(lang, sentence):
     indexes = indexesFromSentence(lang, sentence)
     indexes.append(EOS_token)
-    return torch.tensor(indexes, dtype = torch.long).view(-1, 1)
+    indexes += [PAD_token] * (MAX_LENGTH - len(indexes))
+    return torch.tensor([indexes], dtype = torch.long)
 
 def tensorsFromPair(input_lang, output_lang, pair):
     input_tensor = tensorFromSentence(input_lang, pair[0])
