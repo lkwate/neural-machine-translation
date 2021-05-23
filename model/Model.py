@@ -74,7 +74,7 @@ class NMTDecoder(nn.Module):
             self.rnn_decoder = nn.LSTM(**decoder_parameters)
         self.dropout = nn.Dropout(args.decoder_dropout)
     
-    def forward(self, y_prev, h_prev, c_prev, encoder_output):
+    def forward(self, y_prev, h_prev, c_prev, encoder_output, encoder_mask_attention=None):
         '''
             arguments : 
                 - y_prev : previous tokens# (batch_size,)
@@ -91,7 +91,7 @@ class NMTDecoder(nn.Module):
         input = self.embedding(y_prev).unsqueeze(-2) # (batch_size, 1, input_size)
         _, (h_t, c_t) = self.rnn_decoder(input, (h_prev, c_prev))
 
-        output_alignment = self.alignment(h_t[-1, :], encoder_output)
+        output_alignment = self.alignment(h_t[-1, :], encoder_output, encoder_mask_attention)
         logits = self.linearVocab(output_alignment[0])
 
         output = (logits, h_t, c_t)
@@ -126,19 +126,20 @@ class NMTTranslator(pl.LightningModule):
 
     def compute_loss(self, batch):
         input_ids = batch[0].squeeze(-2)
-        target_ids = batch[-1].squeeze(-2)
+        target_ids = batch[1].squeeze(-2)
         batch_size = input_ids.shape[0]
-        target_seq_len = target_ids.shape[-1]
-        mask = 1 - (target_ids == 0).to(torch.long)
+        target_seq_len = target_ids.shape[1]
+        decoder_mask_attention = 1 - (target_ids == 0).to(torch.long)
+        encoder_mask_attention = torch.where(input_ids == 0, float('-inf'), 1.)
 
         encoder_output = self.encoder(input_ids)
         decoder_output = [torch.tensor([SOS_token] * batch_size ,dtype=torch.long).type_as(input_ids)]
-        h, c = torch.split(torch.zeros((self.args.num_layers, batch_size, self.args.hidden_size, 2), device=self.device), 1, dim=-1)
+        h, c = torch.split(torch.zeros((self.args.num_layers, batch_size, self.args.hidden_size, 2)).type_as(encoder_output), 1, dim=-1)
         h, c = h.squeeze(-1), c.squeeze(-1)
 
         losses = []
         for i in range(target_seq_len):
-            output = self.decoder(decoder_output[-1], h, c, encoder_output)
+            output = self.decoder(decoder_output[-1], h, c, encoder_output, encoder_mask_attention)
             h, c= output[1], output[2]
 
             y_pred = output[0].argmax(-1) 
@@ -148,6 +149,6 @@ class NMTTranslator(pl.LightningModule):
             losses.append(loss)
         
         loss = torch.cat(losses, -1) # (batch_size, seq_len)
-        loss = loss * mask
+        loss = loss * decoder_mask_attention
 
         return loss.mean()
