@@ -112,7 +112,9 @@ def indexesFromSentence(lang, sentence):
 def tensorFromSentence(lang, sentence):
     indexes = indexesFromSentence(lang, sentence)
     indexes.append(EOS_token)
-    indexes += [PAD_token] * (MAX_LENGTH - len(indexes))
+    if MAX_LENGTH > len(indexes):
+        indexes += [PAD_token] * (MAX_LENGTH - len(indexes))
+    
     return torch.tensor([indexes], dtype = torch.long)
 
 def tensorsFromPair(input_lang, output_lang, pair):
